@@ -33,8 +33,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings(formData);
-    alert('Pengaturan usaha berhasil diperbarui!');
+    const url = (formData.googleAppsScriptUrl || formData.gasWebAppUrl || '').trim();
+    const updated = {
+      ...formData,
+      googleAppsScriptUrl: url,
+      gasWebAppUrl: url,
+      googleSpreadsheetId: (formData.googleSpreadsheetId || '').trim()
+    };
+    onSaveSettings(updated);
+    AppsScriptSyncService.setConfiguration(updated.googleSpreadsheetId, url);
+    alert('Pengaturan usaha & integrasi Google Spreadsheet berhasil disimpan!');
   };
 
   const handleTestConnection = async () => {

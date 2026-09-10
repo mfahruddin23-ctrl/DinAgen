@@ -111,6 +111,9 @@ function doPost(e) {
       case 'saveReconciliation':
         result = saveReconciliation(payload, user);
         break;
+      case 'syncAllData':
+        result = syncAllData(payload, user);
+        break;
       default:
         result = { success: false, message: 'Unknown action: ' + action };
     }
@@ -537,6 +540,46 @@ function deleteTransaction(id, operatorUser) {
     }
   }
   return { success: false, message: 'ID transaksi tidak ditemukan' };
+}
+
+function syncAllData(payload, operatorUser) {
+  const result = {
+    transactionsCount: 0,
+    cashInCount: 0,
+    cashOutCount: 0
+  };
+
+  if (payload.transactions && Array.isArray(payload.transactions)) {
+    const trxSheet = getSheet(SHEET_NAMES.TRANSAKSI);
+    const existingIds = new Set(trxSheet.getDataRange().getValues().slice(1).map(r => r[0]));
+    
+    payload.transactions.forEach(t => {
+      if (!existingIds.has(t.id)) {
+        saveTransaction(t, operatorUser || 'sync');
+        result.transactionsCount++;
+      }
+    });
+  }
+
+  if (payload.cashIn && Array.isArray(payload.cashIn)) {
+    payload.cashIn.forEach(c => {
+      saveCashIn(c, operatorUser || 'sync');
+      result.cashInCount++;
+    });
+  }
+
+  if (payload.cashOut && Array.isArray(payload.cashOut)) {
+    payload.cashOut.forEach(c => {
+      saveCashOut(c, operatorUser || 'sync');
+      result.cashOutCount++;
+    });
+  }
+
+  return {
+    success: true,
+    message: 'Sinkronisasi selesai. Berhasil menyinkronkan data ke Google Spreadsheet.',
+    details: result
+  };
 }
 `
   },

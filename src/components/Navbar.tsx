@@ -14,9 +14,10 @@ import {
   CloudCheck,
   CloudOff,
   Menu,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
-import { AppsScriptSyncService } from '../services/appsScriptSync';
+import { AppsScriptSyncService, SyncStatus } from '../services/appsScriptSync';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -43,7 +44,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [timeStr, setTimeStr] = useState(getCurrentTimeString());
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const syncStatus = AppsScriptSyncService.getSyncStatus();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => AppsScriptSyncService.getSyncStatus());
+
+  useEffect(() => {
+    const unsub = AppsScriptSyncService.subscribe((status) => {
+      setSyncStatus(status);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -110,20 +118,45 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Google Spreadsheet Sync Status Pill */}
           <button
             onClick={onOpenAppsScriptModal}
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-              syncStatus.isConfigured
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border transition shadow-xs ${
+              syncStatus.syncing
+                ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800'
+                : syncStatus.pendingCount > 0
+                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                : syncStatus.isConfigured
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
             }`}
-            title="Pengaturan Google Spreadsheet & Apps Script"
+            title={
+              syncStatus.syncing
+                ? 'Sedang mengirim data realtime ke Google Spreadsheet...'
+                : syncStatus.pendingCount > 0
+                ? `${syncStatus.pendingCount} transaksi dalam antrean sinkronisasi. Klik untuk detail.`
+                : syncStatus.isConfigured
+                ? `Sinkronisasi Realtime Spreadsheet Aktif. Terakhir: ${syncStatus.lastSyncTime || 'Baru saja'}`
+                : 'Hubungkan Google Spreadsheet agar transaksi otomatis masuk secara realtime'
+            }
           >
-            {syncStatus.isConfigured ? (
+            {syncStatus.syncing ? (
+              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+            ) : syncStatus.pendingCount > 0 ? (
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
+                <span className="font-bold text-[11px]">{syncStatus.pendingCount}</span>
+              </div>
+            ) : syncStatus.isConfigured ? (
               <CloudCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             ) : (
               <Database className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             )}
             <span className="hidden sm:inline">
-              {syncStatus.isConfigured ? 'Spreadsheet Aktif' : 'Setup Spreadsheet'}
+              {syncStatus.syncing
+                ? 'Sync Spreadsheet...'
+                : syncStatus.pendingCount > 0
+                ? `${syncStatus.pendingCount} Pending`
+                : syncStatus.isConfigured
+                ? 'Spreadsheet Realtime'
+                : 'Setup Spreadsheet'}
             </span>
           </button>
 

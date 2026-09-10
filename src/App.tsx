@@ -131,25 +131,42 @@ export default function App() {
   };
 
   const handleSaveTransaction = (trx: Transaction) => {
+    const operator = currentUser?.name || currentUser?.username || 'Kasir';
     if (editingTransaction) {
-      StorageService.updateTransaction(trx);
+      StorageService.updateTransaction(trx, operator);
       showToast(`Transaksi ${trx.noTransaksi} berhasil diperbarui.`);
+      // Realtime push to Google Spreadsheet
+      AppsScriptSyncService.syncUpdateTransaction(trx, operator).then(res => {
+        if (res.success && AppsScriptSyncService.getEndpointUrl()) {
+          showToast(`⚡ Transaksi ${trx.noTransaksi} terkirim ke Google Spreadsheet!`, 'success');
+        }
+      });
     } else {
-      StorageService.addTransaction(trx);
+      StorageService.addTransaction(trx, operator);
       showToast(`Transaksi ${trx.noTransaksi} berhasil dicatat.`);
+      // Realtime push to Google Spreadsheet
+      AppsScriptSyncService.syncTransaction(trx, operator).then(res => {
+        if (res.success && AppsScriptSyncService.getEndpointUrl()) {
+          showToast(`⚡ Transaksi ${trx.noTransaksi} otomatis masuk ke Google Spreadsheet!`, 'success');
+        }
+      });
     }
     refreshAppData();
   };
 
   const handleDeleteTransaction = (id: string) => {
-    StorageService.deleteTransaction(id, currentUser?.username || 'Kasir');
+    const operator = currentUser?.username || 'Kasir';
+    StorageService.deleteTransaction(id, operator);
+    AppsScriptSyncService.syncDeleteTransaction(id, operator);
     refreshAppData();
     showToast('Transaksi telah berhasil dihapus.', 'info');
   };
 
   // Cashflow Handlers
   const handleAddCashIn = (item: CashIn) => {
-    StorageService.addCashIn(item);
+    const operator = currentUser?.username || 'Kasir';
+    StorageService.addCashIn(item, operator);
+    AppsScriptSyncService.syncCashIn(item, operator);
     refreshAppData();
     showToast(`Kas masuk sebesar Rp ${item.nominal.toLocaleString('id-ID')} berhasil dicatat.`);
   };
@@ -161,7 +178,9 @@ export default function App() {
   };
 
   const handleAddCashOut = (item: CashOut) => {
-    StorageService.addCashOut(item);
+    const operator = currentUser?.username || 'Kasir';
+    StorageService.addCashOut(item, operator);
+    AppsScriptSyncService.syncCashOut(item, operator);
     refreshAppData();
     showToast(`Kas keluar sebesar Rp ${item.nominal.toLocaleString('id-ID')} berhasil dicatat.`);
   };
@@ -180,7 +199,9 @@ export default function App() {
 
   // Reconciliation & Closing Handlers
   const handleSaveReconciliation = (rec: CashReconciliation) => {
-    StorageService.addReconciliation(rec);
+    const operator = currentUser?.username || 'Kasir';
+    StorageService.addReconciliation(rec, operator);
+    AppsScriptSyncService.syncReconciliation(rec, operator);
     refreshAppData();
     showToast('Hasil rekonsiliasi kas fisik berhasil disimpan.');
   };
@@ -212,9 +233,16 @@ export default function App() {
 
   // Settings Handler
   const handleSaveSettings = (newSettings: BusinessSettings) => {
-    StorageService.saveSettings(newSettings, currentUser?.username || 'admin');
+    const url = (newSettings.gasWebAppUrl || newSettings.googleAppsScriptUrl || '').trim();
+    const updated = {
+      ...newSettings,
+      gasWebAppUrl: url,
+      googleAppsScriptUrl: url
+    };
+    StorageService.saveSettings(updated, currentUser?.username || 'admin');
+    AppsScriptSyncService.setConfiguration(updated.googleSpreadsheetId, url);
     refreshAppData();
-    showToast('Pengaturan profil usaha berhasil disimpan.');
+    showToast('Pengaturan profil usaha & Google Spreadsheet berhasil disimpan.');
   };
 
   // If not logged in, render Login Screen
