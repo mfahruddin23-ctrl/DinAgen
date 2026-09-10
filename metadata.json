@@ -1,0 +1,7 @@
+{
+  "name": "ATM Mini BRILink - Sistem Rekap Pembukuan",
+  "description": "Sistem rekap pembukuan transaksi harian, saldo modal, biaya admin, keuntungan, dan laporan keuangan usaha ATM Mini BRILink.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

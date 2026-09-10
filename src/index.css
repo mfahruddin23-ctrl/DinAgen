@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@media print {
+  /* Hide non-printable UI elements */
+  header, nav, aside, .no-print, button, input, select {
+    display: none !important;
+  }
+
+  /* Reset layout for clean paper print */
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* When printing thermal receipt specifically */
+  body:has(#thermal-receipt-container) * {
+    visibility: hidden;
+  }
+
+  body:has(#thermal-receipt-container) #thermal-receipt-container,
+  body:has(#thermal-receipt-container) #thermal-receipt-container * {
+    visibility: visible;
+  }
+
+  body:has(#thermal-receipt-container) #thermal-receipt-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  @page {
+    margin: 10mm;
+    size: auto;
+  }
+}
