@@ -5,7 +5,8 @@ import {
   CashOut,
   BalanceSummary,
   BusinessSettings,
-  TransactionType
+  TransactionType,
+  NavTab
 } from '../types';
 import {
   formatRupiah,
@@ -29,7 +30,8 @@ import {
   XCircle,
   HelpCircle,
   Zap,
-  ArrowRight
+  ArrowRight,
+  SlidersHorizontal
 } from 'lucide-react';
 import { DashboardCharts } from './DashboardCharts';
 
@@ -42,6 +44,7 @@ interface DashboardViewProps {
   onNewTransaction: (presetType?: TransactionType) => void;
   onViewAllTransactions: () => void;
   onPrintReceipt: (transaction: Transaction) => void;
+  onSelectTab?: (tab: NavTab) => void;
 }
 
 type FilterPeriod = 'today' | 'week' | 'month' | 'year' | 'custom';
@@ -54,7 +57,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   settings,
   onNewTransaction,
   onViewAllTransactions,
-  onPrintReceipt
+  onPrintReceipt,
+  onSelectTab
 }) => {
   const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>('today');
   const [customStartDate, setCustomStartDate] = useState(getTodayDateString());
@@ -260,7 +264,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-extrabold text-slate-900 dark:text-white">
               {formatRupiah(balance.kasTunai)}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Uang fisik tunai siap pakai</p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-[11px] text-slate-500">Uang fisik tunai siap pakai</p>
+              {onSelectTab && (
+                <button
+                  onClick={() => onSelectTab('pengaturan-kas')}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                >
+                  <SlidersHorizontal className="w-3 h-3" /> Atur / Reset
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -276,7 +290,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-extrabold text-slate-900 dark:text-white">
               {formatRupiah(balance.rekeningBRILink)}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Saldo mutasi rekening EDC/Web</p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-[11px] text-slate-500">Saldo mutasi rekening EDC/Web</p>
+              {onSelectTab && (
+                <button
+                  onClick={() => onSelectTab('pengaturan-kas')}
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1"
+                >
+                  <SlidersHorizontal className="w-3 h-3" /> Atur / Mutasi
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

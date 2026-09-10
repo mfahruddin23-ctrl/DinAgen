@@ -434,6 +434,25 @@ export const StorageService = {
       kasTunai -= c.nominal;
     });
 
+    // Perhitungkan mutasi transfer langsung antar akun (Kas Laci <-> Rekening Bank) jika ada
+    const storedMutationsRaw = localStorage.getItem(STORAGE_KEYS.MUTATIONS);
+    if (storedMutationsRaw) {
+      try {
+        const storedMutations: BalanceMutation[] = JSON.parse(storedMutationsRaw);
+        storedMutations.forEach(m => {
+          if (m.dariAkun === 'Kas Tunai' && m.keAkun === 'Rekening BRILink') {
+            kasTunai -= m.nominal;
+            rekeningBRILink += m.nominal;
+          } else if (m.dariAkun === 'Rekening BRILink' && m.keAkun === 'Kas Tunai') {
+            rekeningBRILink -= m.nominal;
+            kasTunai += m.nominal;
+          }
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     return {
       kasTunai,
       rekeningBRILink,
@@ -867,6 +886,408 @@ export const StorageService = {
     const user = actor || this.getCurrentUser()?.username || 'Kasir';
     const res = this.restoreBackup(jsonString, user);
     return res.success;
+  },
+
+  // CASH MANAGEMENT & CASH RESET METHODS
+  saveCashSettings(
+    cashConfig: {
+      saldoAwalKasTunai: number;
+      saldoAwalRekening: number;
+      minKasTunaiLaci?: number;
+      maxKasTunaiLaci?: number;
+      minSaldoRekening?: number;
+    },
+    actor?: string
+  ): void {
+    const user = actor || this.getCurrentUser()?.username || 'Kasir';
+    const settings = this.getSettings();
+    const updated: BusinessSettings = {
+      ...settings,
+      saldoAwalKasTunai: cashConfig.saldoAwalKasTunai,
+      saldoAwalRekening: cashConfig.saldoAwalRekening,
+      minKasTunaiLaci: cashConfig.minKasTunaiLaci ?? settings.minKasTunaiLaci ?? 3000000,
+      maxKasTunaiLaci: cashConfig.maxKasTunaiLaci ?? settings.maxKasTunaiLaci ?? 25000000,
+      minSaldoRekening: cashConfig.minSaldoRekening ?? settings.minSaldoRekening ?? 5000000,
+    };
+    this.saveSettings(updated, user);
+    this.logAudit(
+      user,
+      'Pengaturan Kas',
+      `Ubah parameter kas: Modal Awal Kas Rp ${cashConfig.saldoAwalKasTunai.toLocaleString('id-ID')}, Modal Awal Bank Rp ${cashConfig.saldoAwalRekening.toLocaleString('id-ID')}`
+    );
+    notifyListeners();
+  },
+
+  /**
+   * Sesuaikan / Kalibrasi Saldo Kas Fisik vs Sistem
+   * - baseline: Langsung sesuaikan modal awal sistem sehingga saldo berjalan tepat sesuai target
+   * - transaction: Buat transaksi Kas Masuk / Kas Keluar otomatis agar selisih tercatat di pembukuan
+   */
+  adjustCashBalance(params: {
+    targetKasTunai?: number;
+    targetRekening?: number;
+    mode: 'baseline' | 'transaction';
+    reason: string;
+    actor?: string;
+  }): { success: boolean; message: string; diffTunai: number; diffRekening: number } {
+    const user = params.actor || this.getCurrentUser()?.username || 'Kasir';
+    const currentBalance = this.getBalanceSummary();
+    const settings = this.getSettings();
+
+    let diffTunai = 0;
+    let diffRekening = 0;
+
+    if (params.targetKasTunai !== undefined) {
+      diffTunai = params.targetKasTunai - currentBalance.kasTunai;
+    }
+    if (params.targetRekening !== undefined) {
+      diffRekening = params.targetRekening - currentBalance.rekeningBRILink;
+    }
+
+    if (diffTunai === 0 && diffRekening === 0) {
+      return {
+        success: true,
+        message: 'Saldo kas fisik dan rekening sudah sama persis dengan sistem, tidak ada perubahan yang diperlukan.',
+        diffTunai: 0,
+        diffRekening: 0
+      };
+    }
+
+    const todayDate = getTodayDateString();
+    const nowTime = getCurrentTimeString();
+
+    if (params.mode === 'baseline') {
+      // Ubah baseline saldo awal secara matematis
+      const updatedSettings: BusinessSettings = {
+        ...settings,
+        saldoAwalKasTunai: settings.saldoAwalKasTunai + diffTunai,
+        saldoAwalRekening: settings.saldoAwalRekening + diffRekening,
+        lastCashResetDate: `${todayDate} ${nowTime}`,
+        lastCashResetBy: user,
+        lastCashResetNote: params.reason || 'Kalibrasi saldo langsung'
+      };
+      this.saveSettings(updatedSettings, user);
+      this.logAudit(
+        user,
+        'Kalibrasi Saldo Kas (Baseline)',
+        `Penyesuaian baseline modal: Kas Fisik ${diffTunai >= 0 ? '+' : ''}Rp ${diffTunai.toLocaleString('id-ID')}, Rekening ${diffRekening >= 0 ? '+' : ''}Rp ${diffRekening.toLocaleString('id-ID')}. Alasan: ${params.reason}`
+      );
+    } else {
+      // Mode Transaksi: Catat selisih ke Kas Masuk / Kas Keluar & Mutasi
+      if (diffTunai > 0) {
+        this.addCashIn(
+          {
+            id: `CIN-ADJ-${Date.now().toString(36).toUpperCase()}`,
+            tanggal: todayDate,
+            jam: nowTime,
+            sumber: 'Modal Usaha',
+            kategori: 'Modal Usaha',
+            nominal: diffTunai,
+            diterimaDari: user,
+            metodePenerimaan: 'Tunai',
+            keterangan: `[Penyesuaian Kas Laci] ${params.reason || 'Selisih kas fisik lebih'}`,
+            petugas: user,
+            createdAt: new Date().toISOString()
+          },
+          user
+        );
+      } else if (diffTunai < 0) {
+        this.addCashOut(
+          {
+            id: `COT-ADJ-${Date.now().toString(36).toUpperCase()}`,
+            tanggal: todayDate,
+            jam: nowTime,
+            kategori: 'Operasional',
+            nominal: Math.abs(diffTunai),
+            diberikanKepada: 'Penyesuaian Laci',
+            metodePembayaran: 'Tunai',
+            keterangan: `[Penyesuaian Kas Laci] ${params.reason || 'Selisih kas fisik kurang'}`,
+            petugas: user,
+            createdAt: new Date().toISOString()
+          },
+          user
+        );
+      }
+
+      if (diffRekening !== 0) {
+        this.addMutation(
+          {
+            id: `MUT-ADJ-${Date.now().toString(36).toUpperCase()}`,
+            tanggal: todayDate,
+            jam: nowTime,
+            tipeAkun: 'Rekening BRILink',
+            jenisMutasi: diffRekening > 0 ? 'MASUK' : 'KELUAR',
+            nominal: Math.abs(diffRekening),
+            dariAkun: diffRekening > 0 ? 'Koreksi Bank' : 'Rekening BRILink',
+            keAkun: diffRekening > 0 ? 'Rekening BRILink' : 'Koreksi Bank',
+            alasan: `[Penyesuaian Rekening] ${params.reason || 'Koreksi saldo bank'}`,
+            petugas: user,
+            createdAt: new Date().toISOString()
+          },
+          user
+        );
+      }
+
+      const updatedSettings: BusinessSettings = {
+        ...settings,
+        lastCashResetDate: `${todayDate} ${nowTime}`,
+        lastCashResetBy: user,
+        lastCashResetNote: params.reason
+      };
+      this.saveSettings(updatedSettings, user);
+      this.logAudit(
+        user,
+        'Penyesuaian Kas (Transaksi)',
+        `Catat penyesuaian: Kas Tunai ${diffTunai >= 0 ? '+' : ''}Rp ${diffTunai.toLocaleString('id-ID')}, Rekening ${diffRekening >= 0 ? '+' : ''}Rp ${diffRekening.toLocaleString('id-ID')}`
+      );
+    }
+
+    notifyListeners();
+    return {
+      success: true,
+      message: `Saldo kas berhasil disesuaikan. (Selisih Kas Tunai: Rp ${diffTunai.toLocaleString('id-ID')}, Selisih Rekening: Rp ${diffRekening.toLocaleString('id-ID')})`,
+      diffTunai,
+      diffRekening
+    };
+  },
+
+  /**
+   * Reset Kas Shift / Tutup Shift Harian
+   * Menetapkan modal kas tunai laci untuk shift baru (misal modal float Rp 5.000.000)
+   * dan sisa uang kas tunai dicatat sebagai Setor Pemilik / Brankas
+   */
+  resetDailyShiftCash(params: {
+    newKasTunai: number;
+    note: string;
+    actor?: string;
+  }): { success: boolean; message: string; selisihKas: number } {
+    const user = params.actor || this.getCurrentUser()?.username || 'Kasir';
+    const currentBalance = this.getBalanceSummary();
+    const todayDate = getTodayDateString();
+    const nowTime = getCurrentTimeString();
+    const currentKas = currentBalance.kasTunai;
+    const sisaUangDisetor = currentKas - params.newKasTunai;
+
+    if (sisaUangDisetor > 0) {
+      // Kelebihan kas di atas modal shift ditarik / disetor ke pemilik
+      this.addCashOut(
+        {
+          id: `COT-SFT-${Date.now().toString(36).toUpperCase()}`,
+          tanggal: todayDate,
+          jam: nowTime,
+          kategori: 'Penarikan modal',
+          nominal: sisaUangDisetor,
+          diberikanKepada: 'Pemilik / Brankas Toko',
+          metodePembayaran: 'Tunai',
+          keterangan: `[Tutup Shift] Setor sisa kas ke pemilik/brankas. Sisa modal shift baru: Rp ${params.newKasTunai.toLocaleString('id-ID')}. ${params.note}`,
+          petugas: user,
+          createdAt: new Date().toISOString()
+        },
+        user
+      );
+    } else if (sisaUangDisetor < 0) {
+      // Kas kurang dari modal shift, perlu tambahan modal
+      const injeksi = Math.abs(sisaUangDisetor);
+      this.addCashIn(
+        {
+          id: `CIN-SFT-${Date.now().toString(36).toUpperCase()}`,
+          tanggal: todayDate,
+          jam: nowTime,
+          sumber: 'Modal usaha',
+          kategori: 'Modal usaha',
+          nominal: injeksi,
+          diterimaDari: 'Pemilik Usaha',
+          metodePenerimaan: 'Tunai',
+          keterangan: `[Awal Shift] Tambahan modal kas laci dari pemilik untuk modal shift baru Rp ${params.newKasTunai.toLocaleString('id-ID')}. ${params.note}`,
+          petugas: user,
+          createdAt: new Date().toISOString()
+        },
+        user
+      );
+    }
+
+    const settings = this.getSettings();
+    const updatedSettings: BusinessSettings = {
+      ...settings,
+      lastCashResetDate: `${todayDate} ${nowTime}`,
+      lastCashResetBy: user,
+      lastCashResetNote: `Tutup shift: Kas disetel ke Rp ${params.newKasTunai.toLocaleString('id-ID')}`
+    };
+    this.saveSettings(updatedSettings, user);
+
+    this.logAudit(
+      user,
+      'Reset Kas Shift',
+      `Serah terima / reset shift: Kas sebelum Rp ${currentKas.toLocaleString('id-ID')}, Kas shift baru disetel Rp ${params.newKasTunai.toLocaleString('id-ID')}`
+    );
+
+    notifyListeners();
+    return {
+      success: true,
+      message: `Reset kas shift berhasil! Saldo kas laci kini siap untuk shift berikutnya sebesar Rp ${params.newKasTunai.toLocaleString('id-ID')}.`,
+      selisihKas: sisaUangDisetor
+    };
+  },
+
+  /**
+   * Pembersihan / Reset Data Kas & Transaksi (Emergency / Maintenance Purge)
+   * Menyediakan backup otomatis sebelum eksekusi
+   */
+  clearCashData(options: {
+    resetType: 'cashflow_only' | 'all_transactions' | 'reconciliations_only' | 'full_factory_reset';
+    newInitialCash?: number;
+    newInitialBank?: number;
+    actor?: string;
+  }): { success: boolean; message: string } {
+    const user = options.actor || this.getCurrentUser()?.username || 'Kasir';
+
+    // 1. Buat cadangan data otomatis sebelum direset!
+    this.createBackupSnapshot(user);
+
+    if (options.resetType === 'cashflow_only') {
+      // Kosongkan riwayat kas masuk & kas keluar saja
+      localStorage.setItem(STORAGE_KEYS.CASH_IN, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.CASH_OUT, JSON.stringify([]));
+      this.logAudit(user, 'Reset Arus Kas', 'Mengosongkan seluruh riwayat kas masuk dan kas keluar');
+      notifyListeners();
+      return {
+        success: true,
+        message: 'Riwayat arus kas masuk dan kas keluar berhasil dikosongkan. Cadangan otomatis telah dibuat.'
+      };
+    }
+
+    if (options.resetType === 'reconciliations_only') {
+      localStorage.setItem(STORAGE_KEYS.RECONCILIATIONS, JSON.stringify([]));
+      this.logAudit(user, 'Reset Rekonsiliasi', 'Mengosongkan seluruh riwayat rekonsiliasi kas');
+      notifyListeners();
+      return {
+        success: true,
+        message: 'Riwayat rekonsiliasi kas berhasil dibersihkan.'
+      };
+    }
+
+    if (options.resetType === 'all_transactions') {
+      // Kosongkan transaksi pembukuan, arus kas, mutasi, tutup buku
+      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.CASH_IN, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.CASH_OUT, JSON.stringify([]));
+      localStorage.removeItem(STORAGE_KEYS.MUTATIONS);
+      localStorage.removeItem(STORAGE_KEYS.DAILY_CLOSINGS);
+      localStorage.setItem(STORAGE_KEYS.RECONCILIATIONS, JSON.stringify([]));
+
+      // Atur saldo modal awal baru jika diisi
+      const settings = this.getSettings();
+      const updated: BusinessSettings = {
+        ...settings,
+        saldoAwalKasTunai: options.newInitialCash !== undefined ? options.newInitialCash : settings.saldoAwalKasTunai,
+        saldoAwalRekening: options.newInitialBank !== undefined ? options.newInitialBank : settings.saldoAwalRekening,
+        lastCashResetDate: `${getTodayDateString()} ${getCurrentTimeString()}`,
+        lastCashResetBy: user,
+        lastCashResetNote: 'Reset seluruh transaksi (buku kas baru)'
+      };
+      this.saveSettings(updated, user);
+
+      this.logAudit(
+        user,
+        'Reset Buku Transaksi',
+        `Mulai pembukuan baru: Saldo Kas Awal Rp ${updated.saldoAwalKasTunai.toLocaleString('id-ID')}, Saldo Bank Awal Rp ${updated.saldoAwalRekening.toLocaleString('id-ID')}`
+      );
+      notifyListeners();
+      return {
+        success: true,
+        message: 'Seluruh transaksi dan arus kas berhasil dikosongkan. Pembukuan baru dimulai dengan aman!'
+      };
+    }
+
+    if (options.resetType === 'full_factory_reset') {
+      this.resetToInitialData();
+      return {
+        success: true,
+        message: 'Seluruh data aplikasi telah dikembalikan ke kondisi awal bawaan pabrik.'
+      };
+    }
+
+    return { success: false, message: 'Tipe reset tidak dikenali.' };
+  },
+
+  // QUICK ACTIONS
+  quickCashInjection(amount: number, note: string, actor?: string): void {
+    const user = actor || this.getCurrentUser()?.username || 'Kasir';
+    this.addCashIn(
+      {
+        id: `CIN-INJ-${Date.now().toString(36).toUpperCase()}`,
+        tanggal: getTodayDateString(),
+        jam: getCurrentTimeString(),
+        sumber: 'Modal usaha',
+        kategori: 'Modal usaha',
+        nominal: amount,
+        diterimaDari: 'Pemilik Usaha',
+        metodePenerimaan: 'Tunai',
+        keterangan: note || 'Tambah Modal Kas Tunai Laci',
+        petugas: user,
+        createdAt: new Date().toISOString()
+      },
+      user
+    );
+  },
+
+  quickCashWithdrawal(amount: number, note: string, actor?: string): void {
+    const user = actor || this.getCurrentUser()?.username || 'Kasir';
+    this.addCashOut(
+      {
+        id: `COT-WDR-${Date.now().toString(36).toUpperCase()}`,
+        tanggal: getTodayDateString(),
+        jam: getCurrentTimeString(),
+        kategori: 'Penarikan modal',
+        nominal: amount,
+        diberikanKepada: 'Pemilik Usaha',
+        metodePembayaran: 'Tunai',
+        keterangan: note || 'Tarik Modal Kas Tunai / Setor Bank',
+        petugas: user,
+        createdAt: new Date().toISOString()
+      },
+      user
+    );
+  },
+
+  transferCashToBank(amount: number, note: string, actor?: string): void {
+    const user = actor || this.getCurrentUser()?.username || 'Kasir';
+    this.addMutation(
+      {
+        id: `MUT-CTB-${Date.now().toString(36).toUpperCase()}`,
+        tanggal: getTodayDateString(),
+        jam: getCurrentTimeString(),
+        tipeAkun: 'Setor Kas ke Rekening',
+        jenisMutasi: 'TRANSFER',
+        nominal: amount,
+        dariAkun: 'Kas Tunai',
+        keAkun: 'Rekening BRILink',
+        alasan: note || 'Setor uang fisik kas laci ke rekening bank BRILink',
+        petugas: user,
+        createdAt: new Date().toISOString()
+      },
+      user
+    );
+  },
+
+  transferBankToCash(amount: number, note: string, actor?: string): void {
+    const user = actor || this.getCurrentUser()?.username || 'Kasir';
+    this.addMutation(
+      {
+        id: `MUT-BTC-${Date.now().toString(36).toUpperCase()}`,
+        tanggal: getTodayDateString(),
+        jam: getCurrentTimeString(),
+        tipeAkun: 'Tarik Rekening ke Kas Tunai',
+        jenisMutasi: 'TRANSFER',
+        nominal: amount,
+        dariAkun: 'Rekening BRILink',
+        keAkun: 'Kas Tunai',
+        alasan: note || 'Tarik tunai dari rekening bank untuk isi modal kas laci',
+        petugas: user,
+        createdAt: new Date().toISOString()
+      },
+      user
+    );
   },
 
   resetToInitialData(): void {

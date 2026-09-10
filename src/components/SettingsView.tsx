@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BusinessSettings } from '../types';
+import { BusinessSettings, NavTab } from '../types';
 import {
   Save,
   Building,
@@ -8,7 +8,9 @@ import {
   Database,
   CheckCircle2,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Wallet,
+  SlidersHorizontal
 } from 'lucide-react';
 import { AppsScriptSyncService } from '../services/appsScriptSync';
 
@@ -16,12 +18,14 @@ interface SettingsViewProps {
   settings: BusinessSettings;
   onSaveSettings: (settings: BusinessSettings) => void;
   onOpenAppsScriptCodeModal: () => void;
+  onSelectTab?: (tab: NavTab) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   onSaveSettings,
-  onOpenAppsScriptCodeModal
+  onOpenAppsScriptCodeModal,
+  onSelectTab
 }) => {
   const [formData, setFormData] = useState<BusinessSettings>({ ...settings });
   const [testingConnection, setTestingConnection] = useState(false);
@@ -169,6 +173,69 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <option value="58mm">58 mm (Printer Kasir Mini Bluetooth)</option>
                 <option value="80mm">80 mm (Printer POS Thermal Standar)</option>
               </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2b: Ambang Batas Kas & Saldo Rekening */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-amber-500" />
+              <div>
+                <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                  Ambang Batas Kas Laci &amp; Saldo Rekening
+                </h3>
+                <p className="text-[11px] text-slate-400">Peringatan otomatis saat kas fisik terlalu sedikit atau terlalu banyak</p>
+              </div>
+            </div>
+            {onSelectTab && (
+              <button
+                type="button"
+                onClick={() => onSelectTab('pengaturan-kas')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 transition"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Buka Menu Reset &amp; Kalibrasi Kas
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="block font-semibold mb-1">Batas Minimum Kas Laci (Rp)</label>
+              <input
+                type="number"
+                step={50000}
+                value={formData.minKasTunaiLaci || 500000}
+                onChange={e => handleChange('minKasTunaiLaci', Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm"
+              />
+              <span className="text-[10px] text-slate-400">Peringatan jika kas laci &lt; nilai ini</span>
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Batas Maksimum Kas Laci (Rp)</label>
+              <input
+                type="number"
+                step={1000000}
+                value={formData.maxKasTunaiLaci || 15000000}
+                onChange={e => handleChange('maxKasTunaiLaci', Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm"
+              />
+              <span className="text-[10px] text-slate-400">Rekomendasi setor ke rekening/bank</span>
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Batas Minimum Saldo Rekening (Rp)</label>
+              <input
+                type="number"
+                step={500000}
+                value={formData.minSaldoRekening || 2000000}
+                onChange={e => handleChange('minSaldoRekening', Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm"
+              />
+              <span className="text-[10px] text-slate-400">Peringatan jika saldo EDC/web tipis</span>
             </div>
           </div>
         </div>

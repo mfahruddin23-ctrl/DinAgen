@@ -309,6 +309,22 @@ export const AppsScriptSyncService = {
   },
 
   /**
+   * Sync mutation / cash adjustment to Google Spreadsheet
+   */
+  async syncMutation(mutation: BalanceMutation, user?: string): Promise<{ success: boolean; message?: string }> {
+    const operator = user || mutation.petugas || 'Kasir';
+    return this.postAction('saveMutation', mutation, operator);
+  },
+
+  /**
+   * Sync business / cash settings to Google Spreadsheet
+   */
+  async syncSettings(settings: BusinessSettings, user?: string): Promise<{ success: boolean; message?: string }> {
+    const operator = user || 'admin';
+    return this.postAction('saveSettings', settings, operator);
+  },
+
+  /**
    * Send all local data at once to populate Google Spreadsheet
    */
   async sendSyncPayload(payload: any): Promise<{ success: boolean; message: string }> {

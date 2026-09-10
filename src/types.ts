@@ -194,6 +194,23 @@ export interface MonthlyRecap {
   saldoAkhirBulan: number;
 }
 
+export type NavTab =
+  | 'dashboard'
+  | 'transaksi'
+  | 'kas-masuk'
+  | 'kas-keluar'
+  | 'mutasi-saldo'
+  | 'rekonsiliasi'
+  | 'pengaturan-kas'
+  | 'rekap-harian'
+  | 'rekap-bulanan'
+  | 'laporan'
+  | 'pelanggan'
+  | 'audit-log'
+  | 'settings'
+  | 'backup'
+  | 'apps-script';
+
 export interface BusinessSettings {
   namaUsaha: string;
   namaPemilik: string;
@@ -202,6 +219,9 @@ export interface BusinessSettings {
   logoUrl?: string;
   saldoAwalKasTunai: number;
   saldoAwalRekening: number;
+  minKasTunaiLaci?: number;       // Batas minimum kas tunai di laci (peringatan kas menipis)
+  maxKasTunaiLaci?: number;       // Batas maksimum kas tunai di laci (peringatan kas menumpuk)
+  minSaldoRekening?: number;      // Batas minimum saldo rekening (peringatan saldo rekening menipis)
   targetKeuntunganBulanan: number;
   defaultBiayaAdmin: number;
   namaOperatorDefault: string;
@@ -211,6 +231,9 @@ export interface BusinessSettings {
   gasWebAppUrl?: string; // Google Apps Script Web App URL
   googleAppsScriptUrl?: string;
   googleSpreadsheetId?: string;
+  lastCashResetDate?: string;
+  lastCashResetBy?: string;
+  lastCashResetNote?: string;
 }
 
 export interface AuditLog {

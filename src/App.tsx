@@ -24,6 +24,7 @@ import { TransactionModal } from './components/TransactionModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { CashflowView } from './components/CashflowView';
 import { ReconciliationView } from './components/ReconciliationView';
+import { CashSettingsView } from './components/CashSettingsView';
 import { ReportView } from './components/ReportView';
 import { CustomersView } from './components/CustomersView';
 import { AuditLogView } from './components/AuditLogView';
@@ -289,6 +290,7 @@ export default function App() {
               onNewTransaction={handleOpenNewTransaction}
               onViewAllTransactions={() => setCurrentTab('transaksi')}
               onPrintReceipt={setReceiptModalTransaction}
+              onSelectTab={setCurrentTab}
             />
           )}
 
@@ -318,6 +320,7 @@ export default function App() {
               onAddCashOut={handleAddCashOut}
               onDeleteCashOut={handleDeleteCashOut}
               onAddMutation={handleAddMutation}
+              onSelectTab={setCurrentTab}
             />
           )}
 
@@ -334,6 +337,7 @@ export default function App() {
               onAddCashOut={handleAddCashOut}
               onDeleteCashOut={handleDeleteCashOut}
               onAddMutation={handleAddMutation}
+              onSelectTab={setCurrentTab}
             />
           )}
 
@@ -350,6 +354,7 @@ export default function App() {
               onAddCashOut={handleAddCashOut}
               onDeleteCashOut={handleDeleteCashOut}
               onAddMutation={handleAddMutation}
+              onSelectTab={setCurrentTab}
             />
           )}
 
@@ -360,6 +365,18 @@ export default function App() {
               currentUser={currentUser}
               settings={settings}
               onSaveReconciliation={handleSaveReconciliation}
+            />
+          )}
+
+          {currentTab === 'pengaturan-kas' && (
+            <CashSettingsView
+              settings={settings}
+              balance={balance}
+              userRole={currentUser?.role || 'KASIR'}
+              currentUsername={currentUser?.username || 'Kasir'}
+              onSaveSettings={handleSaveSettings}
+              onDataMutated={refreshAppData}
+              onSelectTab={setCurrentTab}
             />
           )}
 
@@ -424,6 +441,7 @@ export default function App() {
               settings={settings}
               onSaveSettings={handleSaveSettings}
               onOpenAppsScriptCodeModal={() => setCurrentTab('apps-script')}
+              onSelectTab={setCurrentTab}
             />
           )}
 

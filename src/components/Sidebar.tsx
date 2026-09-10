@@ -16,6 +16,7 @@ import {
   HardDriveDownload,
   Database,
   PlusCircle,
+  SlidersHorizontal,
   X
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export type NavTab =
   | 'kas-keluar'
   | 'mutasi-saldo'
   | 'rekonsiliasi'
+  | 'pengaturan-kas'
   | 'rekap-harian'
   | 'rekap-bulanan'
   | 'laporan'
@@ -67,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'kas-keluar' as NavTab, label: 'Kas Keluar', icon: ArrowUpRight },
         { id: 'mutasi-saldo' as NavTab, label: 'Mutasi Saldo', icon: WalletCards },
         { id: 'rekonsiliasi' as NavTab, label: 'Rekonsiliasi Kas', icon: Scale },
+        { id: 'pengaturan-kas' as NavTab, label: 'Reset & Pengaturan Kas', icon: SlidersHorizontal, badge: 'Penting' },
       ]
     },
     {

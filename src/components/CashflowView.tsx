@@ -7,7 +7,8 @@ import {
   User,
   CashInSource,
   CashOutCategory,
-  PaymentMethod
+  PaymentMethod,
+  NavTab
 } from '../types';
 import {
   formatRupiah,
@@ -25,7 +26,8 @@ import {
   WalletCards,
   ArrowRightLeft,
   Sliders,
-  DollarSign
+  DollarSign,
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface CashflowViewProps {
@@ -40,6 +42,7 @@ interface CashflowViewProps {
   onAddCashOut: (item: CashOut) => void;
   onDeleteCashOut: (id: string) => void;
   onAddMutation: (item: CashMutation) => void;
+  onSelectTab?: (tab: NavTab) => void;
 }
 
 export const CashflowView: React.FC<CashflowViewProps> = ({
@@ -53,7 +56,8 @@ export const CashflowView: React.FC<CashflowViewProps> = ({
   onDeleteCashIn,
   onAddCashOut,
   onDeleteCashOut,
-  onAddMutation
+  onAddMutation,
+  onSelectTab
 }) => {
   // Modal states
   const [showInModal, setShowInModal] = useState(false);
@@ -181,6 +185,23 @@ export const CashflowView: React.FC<CashflowViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Quick Link to Reset & Pengaturan Kas */}
+      {onSelectTab && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-850 p-3.5 rounded-2xl border border-blue-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+            <SlidersHorizontal className="w-4 h-4 text-blue-600 flex-shrink-0" />
+            <span>Ingin mengatur batas minimal kas laci, kalibrasi fisik, serah terima shift, atau reset kas?</span>
+          </div>
+          <button
+            onClick={() => onSelectTab('pengaturan-kas')}
+            className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs whitespace-nowrap shadow-xs transition active:scale-95 flex items-center gap-1.5"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Buka Pengaturan &amp; Reset Kas
+          </button>
+        </div>
+      )}
 
       {/* VIEW: KAS MASUK */}
       {type === 'in' && (
