@@ -1,5 +1,7 @@
 import React from 'react';
-import { UserRole } from '../types';
+import { UserRole, BusinessSettings, NavTab } from '../types';
+
+export type { NavTab };
 import {
   LayoutDashboard,
   ReceiptText,
@@ -17,30 +19,15 @@ import {
   Database,
   PlusCircle,
   SlidersHorizontal,
+  UserCog,
   X
 } from 'lucide-react';
-
-export type NavTab =
-  | 'dashboard'
-  | 'transaksi'
-  | 'kas-masuk'
-  | 'kas-keluar'
-  | 'mutasi-saldo'
-  | 'rekonsiliasi'
-  | 'pengaturan-kas'
-  | 'rekap-harian'
-  | 'rekap-bulanan'
-  | 'laporan'
-  | 'pelanggan'
-  | 'audit-log'
-  | 'settings'
-  | 'backup'
-  | 'apps-script';
 
 interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   userRole?: UserRole;
+  settings?: BusinessSettings;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   onQuickNewTransaction: () => void;
@@ -50,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   userRole = 'ADMIN',
+  settings,
   isOpenMobile,
   onCloseMobile,
   onQuickNewTransaction
@@ -87,8 +75,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'apps-script' as NavTab, label: 'Google Spreadsheet & Script', icon: Database, badge: '10 Sheets' },
         ...(userRole === 'ADMIN' || userRole === 'OWNER'
           ? [
+              { id: 'users' as NavTab, label: 'Pengaturan User', icon: UserCog, badge: 'Kelola' },
               { id: 'audit-log' as NavTab, label: 'Audit Log Aktivitas', icon: History },
-              { id: 'settings' as NavTab, label: 'Pengaturan Usaha', icon: Settings },
+              { id: 'settings' as NavTab, label: 'Pengaturan Usaha & Logo', icon: Settings },
               { id: 'backup' as NavTab, label: 'Backup & Restore', icon: HardDriveDownload },
             ]
           : [])
@@ -120,9 +109,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Mobile Header */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between lg:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#02539a] flex items-center justify-center text-white font-bold text-xs">
-              BRI
-            </div>
+            {settings?.appLogoUrl ? (
+              <img
+                src={settings.appLogoUrl}
+                alt="Logo Aplikasi"
+                className="w-8 h-8 rounded-lg object-contain bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-0.5"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-[#02539a] flex items-center justify-center text-white font-bold text-xs">
+                BRI
+              </div>
+            )}
             <span className="font-bold text-sm text-slate-800 dark:text-slate-100">Menu Pembukuan</span>
           </div>
           <button onClick={onCloseMobile} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">

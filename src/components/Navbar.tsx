@@ -85,11 +85,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <div className="flex items-center gap-2.5">
-            {/* BRILink Logo Badge */}
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#02539a] to-[#00386b] flex items-center justify-center text-white font-extrabold shadow-sm relative overflow-hidden flex-shrink-0">
-              <span className="text-sm font-black tracking-tight">BRI</span>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#f37021] rounded-full" />
-            </div>
+            {/* BRILink Logo Badge / Custom App Logo */}
+            {settings.appLogoUrl ? (
+              <img
+                src={settings.appLogoUrl}
+                alt="Logo Aplikasi"
+                className="w-9 h-9 rounded-xl object-contain bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-0.5 shadow-xs flex-shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#02539a] to-[#00386b] flex items-center justify-center text-white font-extrabold shadow-sm relative overflow-hidden flex-shrink-0">
+                <span className="text-sm font-black tracking-tight">BRI</span>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#f37021] rounded-full" />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight">

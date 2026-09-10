@@ -29,6 +29,7 @@ import { ReportView } from './components/ReportView';
 import { CustomersView } from './components/CustomersView';
 import { AuditLogView } from './components/AuditLogView';
 import { SettingsView } from './components/SettingsView';
+import { UsersView } from './components/UsersView';
 import { BackupView } from './components/BackupView';
 import { AppsScriptView } from './components/AppsScriptView';
 import { Login } from './components/Login';
@@ -273,6 +274,7 @@ export default function App() {
           currentTab={currentTab}
           onSelectTab={setCurrentTab}
           userRole={currentUser.role}
+          settings={settings}
           isOpenMobile={isMobileSidebarOpen}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
           onQuickNewTransaction={() => handleOpenNewTransaction()}
@@ -435,6 +437,15 @@ export default function App() {
           {currentTab === 'apps-script' && <AppsScriptView />}
 
           {currentTab === 'audit-log' && <AuditLogView logs={auditLogs} />}
+
+          {currentTab === 'users' && (
+            <UsersView
+              currentUser={currentUser}
+              settings={settings}
+              onRefreshData={refreshAppData}
+              onSelectTab={setCurrentTab}
+            />
+          )}
 
           {currentTab === 'settings' && (
             <SettingsView

@@ -75,18 +75,96 @@ export const StorageService = {
     }
   },
 
-  saveUser(user: User, currentActor: string): void {
+  saveUser(user: User, currentActor: string): { success: boolean; message: string } {
     const users = this.getUsers();
-    const existingIdx = users.findIndex(u => u.id === user.id);
-    if (existingIdx >= 0) {
-      users[existingIdx] = user;
-      this.logAudit(currentActor, 'Edit User', `Update user ${user.username} (${user.role})`);
-    } else {
-      users.push(user);
-      this.logAudit(currentActor, 'Tambah User', `Tambah user baru ${user.username} (${user.role})`);
+    const trimmedUsername = user.username.trim().toLowerCase();
+
+    // Check duplicate username
+    const duplicate = users.find(
+      u => u.username.toLowerCase() === trimmedUsername && u.id !== user.id
+    );
+    if (duplicate) {
+      return {
+        success: false,
+        message: `Username "${user.username}" sudah dipakai oleh ${duplicate.name}. Gunakan username lain.`
+      };
     }
+
+    const cleanUser: User = {
+      ...user,
+      username: trimmedUsername,
+      name: user.name.trim(),
+      updatedAt: new Date().toISOString()
+    } as User;
+
+    const existingIdx = users.findIndex(u => u.id === cleanUser.id);
+    if (existingIdx >= 0) {
+      users[existingIdx] = cleanUser;
+      this.logAudit(
+        currentActor,
+        'Edit User',
+        `Update profil pengguna ${cleanUser.username} (${cleanUser.name}, Role: ${cleanUser.role}, Status: ${cleanUser.status})`
+      );
+    } else {
+      cleanUser.createdAt = cleanUser.createdAt || new Date().toISOString();
+      users.push(cleanUser);
+      this.logAudit(
+        currentActor,
+        'Tambah User',
+        `Tambah pengguna baru ${cleanUser.username} (${cleanUser.name}, Role: ${cleanUser.role})`
+      );
+    }
+
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+
+    // If current logged in user is the one being updated, refresh current user state
+    const current = this.getCurrentUser();
+    if (current && current.id === cleanUser.id) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(cleanUser));
+    }
+
     notifyListeners();
+    return {
+      success: true,
+      message: existingIdx >= 0 ? 'Data pengguna berhasil diperbarui.' : 'Pengguna baru berhasil ditambahkan.'
+    };
+  },
+
+  deleteUser(userId: string, currentActor: string): { success: boolean; message: string } {
+    const users = this.getUsers();
+    const target = users.find(u => u.id === userId);
+    if (!target) {
+      return { success: false, message: 'Pengguna tidak ditemukan.' };
+    }
+
+    const current = this.getCurrentUser();
+    if (current && current.id === userId) {
+      return {
+        success: false,
+        message: 'Anda tidak dapat menghapus akun yang sedang aktif digunakan saat ini.'
+      };
+    }
+
+    const adminCount = users.filter(
+      u => (u.role === 'ADMIN' || u.role === 'OWNER') && u.status === 'ACTIVE'
+    ).length;
+
+    if ((target.role === 'ADMIN' || target.role === 'OWNER') && adminCount <= 1) {
+      return {
+        success: false,
+        message: 'Tidak dapat menghapus akun Administrator/Owner terakhir yang aktif.'
+      };
+    }
+
+    const filtered = users.filter(u => u.id !== userId);
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filtered));
+    this.logAudit(
+      currentActor,
+      'Hapus User',
+      `Menghapus akun pengguna ${target.username} (${target.name}, Role: ${target.role})`
+    );
+    notifyListeners();
+    return { success: true, message: `Akun ${target.username} (${target.name}) berhasil dihapus.` };
   },
 
   getCurrentUser(): User | null {
@@ -755,15 +833,36 @@ export const StorageService = {
 
   // CONVENIENCE WRAPPERS & EXTENDED HELPERS
   authenticateUser(username: string, pass: string): User | null {
-    const users = this.getUsers();
-    const found = users.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
-    if (!found) return null;
-    // Password match: accept either hashed password or demo direct string
-    if (found.password && (found.password === pass || pass.length > 0)) {
-      this.setCurrentUser(found);
-      return found;
+    const res = this.loginCheck(username, pass);
+    return res.user || null;
+  },
+
+  loginCheck(username: string, pass: string): { success: boolean; user?: User; error?: string } {
+    const trimmedUsername = username.trim().toLowerCase();
+    if (!trimmedUsername || !pass) {
+      return { success: false, error: 'Username dan password wajib diisi.' };
     }
-    return null;
+
+    const users = this.getUsers();
+    const found = users.find(u => u.username.toLowerCase() === trimmedUsername);
+    if (!found) {
+      return { success: false, error: 'Username tidak ditemukan dalam sistem.' };
+    }
+
+    if (found.status === 'INACTIVE') {
+      return {
+        success: false,
+        error: 'Akun ini sedang dinonaktifkan. Silakan hubungi Administrator atau Owner.'
+      };
+    }
+
+    // Check exact password
+    if (found.password !== pass) {
+      return { success: false, error: 'Password yang Anda masukkan salah.' };
+    }
+
+    this.setCurrentUser(found);
+    return { success: true, user: found };
   },
 
   logoutUser(): void {

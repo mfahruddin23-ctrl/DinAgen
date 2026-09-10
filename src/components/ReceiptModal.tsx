@@ -126,6 +126,15 @@ Terima kasih atas kunjungan Anda.
           >
             {/* Header Struk */}
             <div className="text-center mb-3">
+              {settings.logoUrl && (
+                <div className="flex justify-center mb-2">
+                  <img
+                    src={settings.logoUrl}
+                    alt={settings.namaUsaha}
+                    className="max-h-12 max-w-[160px] object-contain filter grayscale contrast-125"
+                  />
+                </div>
+              )}
               <div className="font-bold text-sm tracking-wider">ATM MINI BRILINK</div>
               <div className="font-bold text-xs uppercase leading-snug">{settings.namaUsaha}</div>
               <div className="text-[10px] text-slate-600 leading-tight mt-0.5">{settings.alamat}</div>

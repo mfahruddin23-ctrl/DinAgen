@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'OPERATOR' | 'OWNER';
+export type UserRole = 'ADMIN' | 'OPERATOR' | 'OWNER' | 'KASIR';
 
 export interface User {
   id: string;
@@ -206,6 +206,7 @@ export type NavTab =
   | 'rekap-bulanan'
   | 'laporan'
   | 'pelanggan'
+  | 'users'
   | 'audit-log'
   | 'settings'
   | 'backup'
@@ -216,7 +217,8 @@ export interface BusinessSettings {
   namaPemilik: string;
   alamat: string;
   nomorHp: string;
-  logoUrl?: string;
+  logoUrl?: string; // Logo Usaha untuk Struk Cetak & Nota
+  appLogoUrl?: string; // Logo Aplikasi untuk Navbar, Header & Halaman Login
   saldoAwalKasTunai: number;
   saldoAwalRekening: number;
   minKasTunaiLaci?: number;       // Batas minimum kas tunai di laci (peringatan kas menipis)
